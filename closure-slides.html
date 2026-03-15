@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>4.3 Closure 閉包的實際運用</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,400;0,600;0,700;1,400;1,600;1,700&family=IBM+Plex+Sans:wght@300;400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+
+/* ===========================================
+   THEME: OBSIDIAN SERIF
+   Deep black · Amber gold · Ice blue accents
+   Cormorant serif display + IBM Plex body
+   =========================================== */
+:root {
+  --bg:           #0c0c0e;
+  --bg-card:      rgba(255,255,255,0.03);
+  --bg-card-h:    rgba(240,168,85,0.07);
+  --amber:        #f0a855;
+  --amber-dim:    rgba(240,168,85,0.12);
+  --amber-glow:   rgba(240,168,85,0.35);
+  --blue:         #8ab4f8;
+  --blue-dim:     rgba(138,180,248,0.1);
+  --text:         #ede8e2;
+  --muted:        #9e9890;
+  --divider:      rgba(240,168,85,0.14);
+  --divider-soft: rgba(237,232,226,0.06);
+
+  --font-serif:   'Cormorant', Georgia, serif;
+  --font-sans:    'IBM Plex Sans', sans-serif;
+  --font-mono:    'IBM Plex Mono', 'Courier New', monospace;
+
+  --ease-expo:    cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out:  cubic-bezier(0.4, 0, 0.2, 1);
+
+  --title-size:   clamp(1.5rem, 5vw, 4rem);
+  --h2-size:      clamp(1.25rem, 3.5vw, 2.5rem);
+  --h3-size:      clamp(1rem, 2.5vw, 1.75rem);
+  --body-size:    clamp(0.85rem, 1.6vw, 1.1rem);
+  --small-size:   clamp(0.75rem, 1.2vw, 0.95rem);
+  --slide-padding: clamp(1rem, 4vw, 4rem);
+  --content-gap:   clamp(0.5rem, 2vw, 2rem);
+  --element-gap:   clamp(0.25rem, 1vw, 1rem);
+}
+
+/* ===========================================
+   VIEWPORT BASE (mandatory)
+   =========================================== */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  overflow-x: hidden;
+  background: var(--bg);
+  color: var(--text);
+}
+
+html {
+  scroll-snap-type: y mandatory;
+  scroll-behavior: smooth;
+}
+
+.slide {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.slide-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-height: 100%;
+  overflow: hidden;
+  padding: var(--slide-padding);
+}
+
+img, .image-container {
+  max-width: 100%;
+  max-height: min(50vh, 400px);
+  object-fit: contain;
+}
+
+@media (max-height: 700px) {
+  :root {
+    --slide-padding: clamp(0.75rem, 3vw, 2rem);
+    --content-gap:   clamp(0.4rem, 1.5vw, 1rem);
+    --title-size:    clamp(1.25rem, 4.5vw, 2.5rem);
+    --h2-size:       clamp(1rem, 3vw, 1.75rem);
+  }
+}
+@media (max-height: 600px) {
+  :root {
+    --slide-padding: clamp(0.5rem, 2.5vw, 1.5rem);
+    --content-gap:   clamp(0.3rem, 1vw, 0.75rem);
+    --title-size:    clamp(1.1rem, 4vw, 2rem);
+    --body-size:     clamp(0.7rem, 1.2vw, 0.95rem);
+  }
+  .nav-dots, .keyboard-hint, .decorative { display: none; }
+}
+@media (max-height: 500px) {
+  :root {
+    --slide-padding: clamp(0.4rem, 2vw, 1rem);
+    --title-size:    clamp(1rem, 3.5vw, 1.5rem);
+    --h2-size:       clamp(0.9rem, 2.5vw, 1.25rem);
+    --body-size:     clamp(0.65rem, 1vw, 0.85rem);
+  }
+}
+@media (max-width: 600px) {
+  :root { --title-size: clamp(1.25rem, 7vw, 2.5rem); }
+  .grid { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.2s !important;
+  }
+  html { scroll-behavior: auto; }
+}
+
+/* ===========================================
+   REVEAL ANIMATIONS
+   =========================================== */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.7s var(--ease-expo),
+              transform 0.7s var(--ease-expo);
+}
+.reveal-scale {
+  opacity: 0;
+  transform: scale(0.93);
+  transition: opacity 0.6s var(--ease-expo),
+              transform 0.6s var(--ease-expo);
+}
+.slide.visible .reveal,
+.slide.visible .reveal-scale {
+  opacity: 1;
+  transform: none;
+}
+.stagger > *:nth-child(1) { transition-delay: 0.05s; }
+.stagger > *:nth-child(2) { transition-delay: 0.15s; }
+.stagger > *:nth-child(3) { transition-delay: 0.25s; }
+.stagger > *:nth-child(4) { transition-delay: 0.35s; }
+.stagger > *:nth-child(5) { transition-delay: 0.45s; }
+.stagger > *:nth-child(6) { transition-delay: 0.55s; }
+
+/* ===========================================
+   SHARED COMPONENTS
+   =========================================== */
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  pointer-events: none;
+  z-index: 0;
+}
+.v-line {
+  position: absolute;
+  width: 1px;
+  background: linear-gradient(to bottom, transparent, var(--divider) 30%, var(--divider) 70%, transparent);
+  pointer-events: none;
+}
+.chapter-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--font-mono);
+  font-size: var(--small-size);
+  color: var(--amber);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.chapter-tag::before {
+  content: '';
+  display: block;
+  width: 18px;
+  height: 1px;
+  background: var(--amber);
+}
+.h-rule { width: 2.5rem; height: 1px; background: var(--amber); }
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  color: var(--amber);
+  background: var(--amber-dim);
+  border-radius: 3px;
+  padding: 0.1em 0.4em;
+}
+
+.code-block {
+  font-family: var(--font-mono);
+  font-size: clamp(0.62rem, 1.1vw, 0.82rem);
+  line-height: 1.8;
+  background: rgba(0,0,0,0.4);
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  padding: clamp(1rem, 2vw, 1.5rem) clamp(1rem, 2.5vw, 2rem);
+  overflow: hidden;
+  max-height: min(44vh, 400px);
+  position: relative;
+}
+.code-block::before {
+  content: attr(data-lang);
+  position: absolute;
+  top: 0.6rem; right: 1rem;
+  font-size: 0.6rem;
+  letter-spacing: 0.15em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.kw  { color: #c792ea; }
+.fn  { color: var(--blue); }
+.cm  { color: #4a5568; font-style: italic; }
+.num { color: #f0883e; }
+.str { color: #a8d8a8; }
+.ln  { color: rgba(107,101,96,0.4); margin-right: 0.8em; user-select: none; }
+
+.pill { display: inline-block; border-radius: 100px; padding: 0.25em 0.9em; font-family: var(--font-mono); font-size: var(--small-size); letter-spacing: 0.08em; }
+.pill-amber { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(240,168,85,0.25); }
+.pill-blue  { background: var(--blue-dim);  color: var(--blue);  border: 1px solid rgba(138,180,248,0.2); }
+
+.topic-card { border: 1px solid var(--divider-soft); border-radius: 10px; padding: clamp(0.75rem, 1.5vh, 1.25rem) clamp(1rem, 2vw, 1.5rem); background: var(--bg-card); transition: border-color 0.3s, background 0.3s; cursor: default; }
+.topic-card:hover { border-color: var(--divider); background: var(--bg-card-h); }
+
+.bullet-list { list-style: none; display: flex; flex-direction: column; gap: clamp(0.4rem, 1vh, 0.85rem); position: relative; z-index: 1; }
+.bullet-list li { display: flex; gap: 0.8rem; align-items: flex-start; font-family: var(--font-sans); font-size: var(--body-size); font-weight: 300; color: var(--muted); line-height: 1.55; }
+.bullet-list li::before { content: '—'; color: var(--amber); flex-shrink: 0; margin-top: 0.05em; font-weight: 400; }
+.bullet-list li strong { color: var(--text); font-weight: 500; }
+
+/* content-slide helper */
+.content-slide .slide-inner { flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: center; gap: var(--content-gap); padding: var(--slide-padding); position: relative; }
+.content-slide .orb-right { width: 400px; height: 400px; top: -100px; right: -100px; background: radial-gradient(circle, rgba(240,168,85,0.07), transparent 70%); }
+.content-slide .orb-left  { width: 300px; height: 300px; bottom: -100px; left: -80px; background: radial-gradient(circle, rgba(138,180,248,0.06), transparent 70%); }
+.content-slide .slide-title { font-family: var(--font-serif); font-size: var(--h2-size); font-weight: 700; color: var(--text); line-height: 1.15; letter-spacing: -0.01em; position: relative; z-index: 1; }
+.content-slide .slide-title .italic { font-style: italic; color: var(--amber); }
+.content-slide .body-text { font-family: var(--font-sans); font-size: var(--body-size); font-weight: 300; color: var(--muted); line-height: 1.75; max-width: 640px; position: relative; z-index: 1; }
+
+/* two-col */
+.two-col-grid { display: grid; grid-template-columns: 1fr 1.1fr; gap: clamp(1.5rem, 3vw, 4rem); padding: var(--slide-padding); align-items: center; position: relative; flex: 1; overflow: hidden; }
+.two-col-left  { display: flex; flex-direction: column; gap: var(--content-gap); z-index: 1; }
+.two-col-right { display: flex; flex-direction: column; gap: var(--element-gap); z-index: 1; }
+.two-col-left .slide-title { font-family: var(--font-serif); font-size: var(--h2-size); font-weight: 700; color: var(--text); line-height: 1.15; letter-spacing: -0.01em; }
+.two-col-left .slide-title .italic { font-style: italic; color: var(--amber); }
+.two-col-left .body-text { font-family: var(--font-sans); font-size: var(--body-size); font-weight: 300; color: var(--muted); line-height: 1.75; max-width: 340px; }
+.highlight-box { border-left: 2px solid var(--amber); padding: clamp(0.6rem,1.2vh,1rem) clamp(0.8rem,1.5vw,1.25rem); background: var(--amber-dim); border-radius: 0 6px 6px 0; }
+.highlight-box p { font-family: var(--font-sans); font-size: var(--body-size); font-weight: 400; color: var(--text); line-height: 1.6; }
+.highlight-danger { border-left-color: rgba(255,100,80,0.6) !important; background: rgba(255,100,80,0.07) !important; }
+
+/* section break */
+.section-break { justify-content: center; align-items: center; }
+.section-break .sb-inner { display: flex; flex-direction: column; align-items: center; gap: clamp(1rem, 2vh, 2rem); text-align: center; padding: var(--slide-padding); z-index: 2; position: relative; }
+.section-break .sb-num { font-family: var(--font-serif); font-size: clamp(6rem, 18vw, 16rem); font-weight: 700; color: rgba(255,255,255,0.025); line-height: 0.85; letter-spacing: -0.04em; position: absolute; z-index: 0; user-select: none; }
+.section-break .sb-tag { font-family: var(--font-mono); font-size: var(--small-size); color: var(--amber); letter-spacing: 0.25em; text-transform: uppercase; z-index: 2; }
+.section-break .sb-title { font-family: var(--font-serif); font-size: clamp(2rem, 6vw, 5rem); font-weight: 700; font-style: italic; color: var(--text); line-height: 1.1; letter-spacing: -0.01em; z-index: 2; }
+.section-break .sb-desc { font-family: var(--font-sans); font-size: var(--body-size); font-weight: 300; color: var(--muted); max-width: 480px; line-height: 1.7; z-index: 2; }
+
+/* compare cards */
+.compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(0.8rem, 1.5vw, 1.5rem); position: relative; z-index: 1; }
+.compare-card { border: 1px solid var(--divider-soft); border-radius: 12px; padding: clamp(1rem, 2vh, 1.75rem) clamp(1rem, 2vw, 1.5rem); background: var(--bg-card); display: flex; flex-direction: column; gap: 0.6rem; }
+.compare-card.amber { border-color: rgba(240,168,85,0.2); }
+.compare-card.blue  { border-color: rgba(138,180,248,0.2); }
+.cc-label { font-family: var(--font-mono); font-size: var(--small-size); letter-spacing: 0.15em; text-transform: uppercase; }
+.cc-label.amber { color: var(--amber); }
+.cc-label.blue  { color: var(--blue); }
+.cc-name { font-family: var(--font-serif); font-size: clamp(1.2rem, 2.5vw, 1.75rem); font-weight: 700; color: var(--text); }
+.cc-desc { font-family: var(--font-sans); font-size: var(--small-size); font-weight: 300; color: var(--muted); line-height: 1.6; }
+.cc-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.4rem; }
+.cc-tag { font-family: var(--font-mono); font-size: 0.6rem; padding: 0.2em 0.6em; border-radius: 4px; letter-spacing: 0.08em; }
+.cc-tag.amber { background: var(--amber-dim); color: var(--amber); }
+.cc-tag.blue  { background: var(--blue-dim); color: var(--blue); }
+
+/* ===========================================
+   UI CHROME
+   =========================================== */
+#progress-bar {
+  position: fixed; top: 0; left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--amber), rgba(240,168,85,0.3));
+  transition: width 0.3s var(--ease-in-out);
+  z-index: 1000;
+  box-shadow: 0 0 8px var(--amber-glow);
+}
+#nav-dots {
+  position: fixed; right: clamp(1rem, 2vw, 1.75rem); top: 50%;
+  transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 0.45rem; z-index: 1000;
+}
+.nav-dot { width: 5px; height: 5px; border-radius: 50%; background: rgba(240,168,85,0.2); transition: all 0.3s ease; cursor: pointer; border: none; }
+.nav-dot.active { background: var(--amber); height: 16px; border-radius: 3px; box-shadow: 0 0 6px var(--amber-glow); }
+.nav-dot:hover { background: rgba(240,168,85,0.5); }
+.slide-counter { position: fixed; bottom: clamp(1rem, 2vh, 1.75rem); right: clamp(1rem, 2vw, 1.75rem); font-family: var(--font-mono); font-size: 0.62rem; color: var(--muted); letter-spacing: 0.1em; z-index: 1000; }
+
+/* ===========================================
+   INLINE EDITOR
+   =========================================== */
+.edit-hotzone { position: fixed; top: 0; left: 0; width: 80px; height: 80px; z-index: 10000; cursor: pointer; }
+#editToggle {
+  position: fixed; top: 1rem; left: 1rem;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.3s ease; z-index: 10001;
+  background: var(--amber-dim); border: 1px solid var(--divider);
+  border-radius: 8px; color: var(--amber);
+  font-family: var(--font-mono); font-size: 0.7rem;
+  padding: 0.4rem 0.8rem; cursor: pointer; letter-spacing: 0.1em;
+}
+#editToggle.show, #editToggle.active { opacity: 1; pointer-events: auto; }
+#editToggle.active { background: var(--amber); color: var(--bg); }
+
+body.edit-mode [contenteditable] { outline: 1px solid rgba(240,168,85,0.4); border-radius: 3px; cursor: text; }
+body.edit-mode [contenteditable]:focus { outline: 1px solid var(--amber); background: rgba(240,168,85,0.05); }
+
+/* ===========================================
+   SLIDE 01 — TITLE
+   =========================================== */
+#s01 .slide-inner { flex: 1; display: flex; position: relative; overflow: hidden; }
+#s01 .orb-a { width: 600px; height: 600px; top: -250px; right: -100px; background: radial-gradient(circle, rgba(240,168,85,0.1), transparent 70%); }
+#s01 .orb-b { width: 400px; height: 400px; bottom: -150px; left: 20%; background: radial-gradient(circle, rgba(138,180,248,0.07), transparent 70%); }
+#s01 .v-line { left: 52%; top: 0; bottom: 0; }
+#s01 .left { width: 52%; padding: var(--slide-padding); display: flex; flex-direction: column; justify-content: center; gap: clamp(1.2rem, 2.5vh, 2.5rem); position: relative; z-index: 2; }
+#s01 .right { width: 48%; padding: var(--slide-padding); display: flex; flex-direction: column; justify-content: center; gap: clamp(0.8rem, 1.5vh, 1.25rem); position: relative; z-index: 2; }
+#s01 .big-title { font-family: var(--font-serif); font-size: clamp(3rem, 8vw, 7rem); font-weight: 700; line-height: 0.92; letter-spacing: -0.02em; color: var(--text); }
+#s01 .big-title .italic { font-style: italic; color: var(--amber); }
+#s01 .sub-title { font-family: var(--font-serif); font-style: italic; font-size: clamp(1.2rem, 3vw, 2.2rem); color: rgba(237,232,226,0.45); font-weight: 400; }
+#s01 .desc { font-family: var(--font-sans); font-size: var(--body-size); font-weight: 300; color: var(--muted); line-height: 1.7; max-width: 360px; }
+#s01 .topic-entry { padding: clamp(0.6rem, 1.2vh, 1rem) 0; border-bottom: 1px solid var(--divider-soft); display: flex; gap: 1.2rem; align-items: flex-start; transition: border-color 0.3s; }
+#s01 .topic-entry:hover { border-bottom-color: var(--divider); }
+#s01 .e-num { font-family: var(--font-mono); font-size: var(--small-size); color: var(--amber); opacity: 0.6; min-width: 1.8rem; padding-top: 0.1rem; }
+#s01 .e-body h3 { font-family: var(--font-serif); font-size: clamp(0.95rem, 1.8vw, 1.25rem); font-weight: 600; color: var(--text); line-height: 1.2; }
+#s01 .e-body p { font-family: var(--font-sans); font-size: var(--small-size); font-weight: 300; color: var(--muted); margin-top: 0.2rem; line-height: 1.5; }
+
+/* concept cards (slide 03) */
+.concept-grid { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(0.6rem, 1.2vw, 1rem); position: relative; z-index: 1; max-width: 780px; }
+.concept-card { border: 1px solid var(--divider-soft); border-radius: 10px; padding: clamp(0.8rem, 1.5vh, 1.25rem) clamp(1rem, 2vw, 1.5rem); background: var(--bg-card); transition: border-color 0.3s, background 0.3s; }
+.concept-card:hover { border-color: var(--divider); background: var(--bg-card-h); }
+.concept-card .c-icon { font-family: var(--font-mono); font-size: var(--small-size); color: var(--amber); margin-bottom: 0.5rem; letter-spacing: 0.1em; }
+.concept-card h3 { font-family: var(--font-serif); font-size: clamp(0.95rem, 1.8vw, 1.2rem); font-weight: 600; color: var(--text); margin-bottom: 0.3rem; line-height: 1.2; }
+.concept-card p { font-family: var(--font-sans); font-size: var(--small-size); font-weight: 300; color: var(--muted); line-height: 1.55; }
+
+/* principle list (slide 06) */
+.principle-row { display: flex; flex-direction: column; gap: clamp(0.5rem, 1.2vh, 1rem); position: relative; z-index: 1; max-width: 680px; }
+.principle { display: flex; align-items: flex-start; gap: 1.5rem; padding: clamp(0.7rem, 1.3vh, 1.1rem) clamp(1rem, 2vw, 1.5rem); border-left: 2px solid transparent; transition: border-color 0.3s, background 0.3s; border-radius: 0 8px 8px 0; }
+.principle:hover { border-left-color: var(--amber); background: var(--amber-dim); }
+.principle-num { font-family: var(--font-mono); font-size: var(--small-size); color: var(--amber); opacity: 0.5; min-width: 1.5rem; padding-top: 0.1em; flex-shrink: 0; }
+.principle-body h3 { font-family: var(--font-serif); font-size: clamp(1rem, 2vw, 1.3rem); font-weight: 600; color: var(--text); margin-bottom: 0.2rem; }
+.principle-body p { font-family: var(--font-sans); font-size: var(--small-size); font-weight: 300; color: var(--muted); line-height: 1.5; }
+
+/* closing */
+#s17 { justify-content: center; align-items: center; text-align: center; }
+#s17 .close-orb { width: 700px; height: 700px; top: 50%; left: 50%; transform: translate(-50%, -50%); background: radial-gradient(circle, rgba(240,168,85,0.08), transparent 65%); }
+#s17 .close-inner { display: flex; flex-direction: column; align-items: center; gap: clamp(1rem, 2vh, 2rem); padding: var(--slide-padding); position: relative; z-index: 2; }
+#s17 .close-title { font-family: var(--font-serif); font-size: clamp(2rem, 6vw, 5.5rem); font-weight: 700; color: var(--text); line-height: 1.05; letter-spacing: -0.02em; }
+#s17 .close-title .italic { font-style: italic; color: var(--amber); }
+#s17 .close-quote { font-family: var(--font-serif); font-style: italic; font-size: clamp(0.9rem, 2vw, 1.3rem); color: rgba(237,232,226,0.45); max-width: 520px; line-height: 1.7; }
+
+</style>
+</head>
+<body>
+
+<div id="progress-bar" style="width:0%"></div>
+<nav id="nav-dots" aria-label="投影片導覽"></nav>
+<div class="slide-counter" id="slide-counter">01 / 17</div>
+<div class="edit-hotzone" id="editHotzone" title="進入編輯模式 (E)"></div>
+<button id="editToggle" title="編輯模式 (E)">✏ 編輯</button>
+
+
+<!-- =====================================================================
+     01 — TITLE
+     ===================================================================== -->
+<section class="slide" id="s01" aria-label="標題頁">
+  <div class="orb orb-a"></div>
+  <div class="orb orb-b"></div>
+  <div class="v-line"></div>
+  <div class="slide-inner">
+    <div class="left">
+      <div class="chapter-tag reveal">Chapter 4.3 · JavaScript 深度解析</div>
+      <div>
+        <h1 class="big-title reveal">Closure<br><span class="italic">閉包</span>的</h1>
+        <p class="sub-title reveal">實際運用</p>
+      </div>
+      <div class="h-rule reveal"></div>
+      <p class="desc reveal">把狀態「關」在函式裡，做出安全又好用的介面——從封裝概念走向 HOF、debounce 與 memoize 的設計思維</p>
+    </div>
+    <div class="right stagger">
+      <div class="topic-entry reveal"><span class="e-num">01</span><div class="e-body"><h3>Closure 核心原理</h3><p>函式結束後，內部狀態為何仍存在</p></div></div>
+      <div class="topic-entry reveal"><span class="e-num">02</span><div class="e-body"><h3>環境隔離與私有狀態</h3><p>把資料藏起來，只暴露合法入口</p></div></div>
+      <div class="topic-entry reveal"><span class="e-num">03</span><div class="e-body"><h3>Higher-Order Function</h3><p>HOC、debounce、throttle 的設計思維</p></div></div>
+      <div class="topic-entry reveal"><span class="e-num">04</span><div class="e-body"><h3>Memoize 與快取策略</h3><p>同樣的輸入不要重算</p></div></div>
+    </div>
+  </div>
+</section>
+
+
+<!-- =====================================================================
+     02 — 最小例子
+     ===================================================================== -->
+<section class="slide" id="s02" aria-label="最小例子">
+  <div class="orb" style="width:350px;height:350px;bottom:-150px;right:0;background:radial-gradient(circle,rgba(138,180,248,0.07),transparent 70%);"></div>
+  <div class="two-col-grid">
+    <div class="two-col-left">
+      <div class="chapter-tag reveal">Closure 核心</div>
+      <h2 class="slide-title reveal" style="font-family:var(--font-serif);font-size:var(--h2-size);font-weight:700;color:var(--text);line-height:1.15;letter-spacing:-0.01em;">先用一個<br><span style="font-style:italic;color:var(--amber);">最小例子</span><br>理解 Closure</h2>
+      <p class="body-text reveal">在 <code>run</code> 裡宣告 <code>a</code>，把內層函式 <code>logA</code> <strong>回傳出去</strong>而不是直接呼叫——</p>
+      <div class="highlight-box reveal">
+        <p><code>run()</code> 明明已執行完，<code>fn()</code> 仍能印出 <code>a</code>。這代表 <code>a</code> 沒有消失，而是被 <code>logA</code> <strong>「帶著走」</strong>。</p>
+      </div>
+    </div>
+    <div class="two-col-right">
+      <p class="reveal" style="font-family:var(--font-mono);font-size:var(--small-size);color:var(--muted);letter-spacing:0.12em;margin-bottom:0.3rem;">JAVASCRIPT</p>
+      <div class="code-block reveal" data-lang="JS">
+        <span class="ln">1</span><span class="kw">function</span> <span class="fn">run</span>() {<br>
+        <span class="ln">2</span>&nbsp;&nbsp;<span class="kw">var</span> a = <span class="num">42</span>;<br>
+        <span class="ln">3</span>&nbsp;&nbsp;<span class="kw">function</span> <span class="fn">logA</span>() {<br>
+        <span class="ln">4</span>&nbsp;&nbsp;&nbsp;&nbsp;console.<span class="fn">log</span>(a);<br>
+        <span class="ln">5</span>&nbsp;&nbsp;}<br>
+        <span class="ln">6</span>&nbsp;&nbsp;<span class="kw">return</span> logA; <span class="cm">// 回傳，不呼叫</span><br>
+        <span class="ln">7</span>}<br>
+        <br>
+        <span class="ln">8</span><span class="kw">var</span> fn = <span class="fn">run</span>();<br>
+        <span class="ln">9</span><span class="fn">fn</span>(); <span class="cm">// ✓ 仍然印出 42</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- =====================================================================
+     03 — Closure 概念四象限
+     ===================================================================== -->
+<section class="slide content-slide" id="s03" aria-label="Closure 概念">
+  <div class="orb orb-right"></div>
+  <div class="slide-inner">
+    <div class="chapter-tag reveal">Closure 概念</div>
+    <h2 class="slide-title reveal">Closure<br><span class="italic">到底在做什麼</span></h2>
+    <div class="concept-grid stagger">
+      <div class="concept-card reveal"><div class="c-icon">01 · 建立環境</div><h3>外層函式建立一個環境</h3><p>包含函式執行時的所有變數與參數</p></div>
+      <div class="concept-card reveal"><div class="c-icon">02 · 引用環境</div><h3>內層函式引用了外部變數</h3><p>即使函式本體移到外部，引用關係仍然成立</p></div>
+      <div class="concept-card reveal"><div class="c-icon">03 · 保留環境</div><h3>外層執行完，環境不會被回收</h3><p>只要內層函式還存在，那段環境就繼續活著</p></div>
+      <div class="concept-card reveal"><div class="c-icon">04 · 受控存取</div><h3>外部只能透過回傳的函式存取</h3><p>無法直接觸碰環境裡的變數，只能走開的入口</p></div>
+    </div>
+  </div>
+</section>
+
+
+<!-- =====================================================================
+     04 — 狀態外露的危險
+     ===================================================================== -->
+<section class="slide" id="s04" aria-label="狀態外露的危險">
+  <div class="orb" style="width:350px;height:350px;top:-80px;right:-80px;background:radial-gradient(circle,rgba(240,168,85,0.07),transparent 70%);"></div>
+  <div class="two-col-grid">
+    <div class="two-col-left">
+      <div class="chapter-tag reveal">狀態管理</div>
+      <h2 class="slide-title reveal">為什麼<br><span class="italic">狀態外露</span><br>很危險</h2>
+      <p class="body-text reveal">假設有一個 <code>balance</code>，提供 <code>deduct</code> 扣款且一次最多扣 <code>10</code> 元——</p>
+      <div class="highlight-box highlight-danger reveal">
+        <p>問題不在 <code>deduct</code> 寫得不好，而是 <strong><code>balance</code> 在外面是公開的</strong>。任何人都可以直接改到它。</p>
+      </div>
+    </div>
+    <div class="two-col-right">
+      <div class="code-block reveal" data-lang="JS">
+        <span class="ln">1</span><span class="kw">var</span> balance = <span class="num">999</span>;<br>
+        <br>
+        <span class="ln">2</span><span class="kw">function</span> <span class="fn">deduct</span>(n) {<br>
+        <span class="ln">3</span>&nbsp;&nbsp;balance -= Math.<span class="fn">max</span>(n, <span class="num">10</span>);<br>
+        <span class="ln">4</span>}<br>
+        <br>
+        <span class="ln">5</span><span class="fn">deduct</span>(<span class="num">13</span>); <span class="cm">// 只扣 10 元（照規則）</span><br>
+        <span class="ln">6</span>balance -= <span class="num">999</span>; <span class="cm">// 💥 外部直接亂改</span><br>
+        <br>
+        <span class="cm">// 規則形同虛設</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- =====================================================================
+     05 — getWallet：closure 封裝
+     ===================================================================== -->
+<section class="slide" id="s05" aria-label="getWallet closure 封裝">
+  <div class="two-col-grid">
+    <div class="two-col-left">
+      <div class="chapter-tag reveal">Closure 封裝</div>
+      <h2 class="slide-title reveal">把狀態<span class="italic">藏起來</span><br>只留合法入口</h2>
+      <p class="body-text reveal">把 <code>balance</code> 放進 <code>getWallet</code> 裡，只回傳對外操作的方法。外界根本拿不到 <code>balance</code>，只能走 <code>wallet.deduct()</code>。</p>
+      <div class="highlight-box reveal">
+        <p style="font-family:var(--font-mono);font-size:var(--small-size);color:var(--amber);line-height:1.6;">balance -= 999;<br><span style="color:var(--muted);">// ReferenceError: balance is not defined</span></p>
+      </div>
+    </div>
+    <div class="two-col-right">
+      <div class="code-block reveal" data-lang="JS">
+        <span class="ln">1</span><span class="kw">function</span> <span class="fn">getWallet</span>() {<br>
+        <span class="ln">2</span>&nbsp;&nbsp;<span class="kw">var</span> balance = <span class="num">999</span>;<br>
+        <br>
+        <span class="ln">3</span>&nbsp;&nbsp;<span class="kw">return</span> {<br>
+        <span class="ln">4</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="fn">deduct</span>(n) {<br>
+        <span class="ln">5</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;balance -= Math.<span class="fn">max</span>(n, <span class="num">10</span>);<br>
+        <span class="ln">6</span>&nbsp;&nbsp;&nbsp;&nbsp;},<br>
+        <span class="ln">7</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="fn">getBalance</span>() {<br>
+        <span class="ln">8</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return</span> balance;<br>
+        <span class="ln">9</span>&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+        <span class="ln">10</span>&nbsp;&nbsp;};<br>
+        <span class="ln">11</span>}<br>
+        <br>
+        <span class="ln">12</span><span class="kw">var</span> wallet = <span class="fn">getWallet</span>();<br>
+        <span class="ln">13</span>wallet.<span class="fn">deduct</span>(<span class="num">13</span>); <span class="cm">// ✓ 只能走入口</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- =====================================================================
+     06 — 設計三原則
+     ===================================================================== -->
+<section class="slide content-slide" id="s06" aria-label="設計三原則">
+  <div class="orb orb-left"></div>
+  <div class="slide-inner">
+    <div class="chapter-tag reveal">設計思維</div>
+    <h2 class="slide-title reveal">你得到的不只是技巧<br>而是一種<span class="italic">設計方式</span></h2>
+    <div class="principle-row stagger">
+      <div class="principle reveal"><span class="principle-num">01</span><div class="principle-body"><h3>把資料藏起來（狀態私有化）</h3><p>讓資料不在外部直接可見，外界無法偶然改動它</p></div></div>
+      <div class="principle reveal"><span class="principle-num">02</span><div class="principle-body"><h3>把行為公開（只暴露 API）</h3><p>回傳一組你允許的操作方法，作為唯一的互動介面</p></div></div>
+      <div class="principle reveal"><span class="principle-num">03</span><div class="principle-body"><h3>讓外界只能在你規定的規則下操作狀態</h3><p>所有合法操作都經過你設計的入口，規則不可繞過</p></div></div>
+    </div>
+  </div>
+</section>
+
+
+<!-- =====================================================================
+     07 — IIFE
+     ===================================================================== -->
+<section class="slide" id="s07" aria-label="IIFE">
+  <div class="two-col-grid">
+    <div class="two-col-left">
+      <div class="chapter-tag reveal">歷史脈絡</div>
+      <h2 class="slide-title reveal">IIFE：早期常見的<br><span class="italic">「隔離外界」</span>寫法</h2>
+      <p class="body-text reveal">在模組化還不普及的年代，用 IIFE 把程式包起來，避免把太多東西掛到 <code>window</code>。外面拿不到 <code>secret</code>，但可以用 <code>window.myLib.api()</code> 操作它。</p>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <span class="pill pill-amber reveal">Immediately Invoked</span>
+        <span class="pill pill-blue reveal">環境隔離</span>
+      </div>
+    </div>
+    <div class="two-col-right">
+      <div class="code-block reveal" data-lang="JS">
+        <span class="cm">// 整段馬上執行，不污染全域</span><br>
+        <span class="ln">1</span>(<span class="kw">function</span> () {<br>
+        <span class="ln">2</span>&nbsp;&nbsp;<span class="kw">var</span> secret = <span class="num">42</span>;<br>
+        <br>
+        <span class="ln">3</span>&nbsp;&nbsp;<span class="kw">function</span> <span class="fn">api</span>() {<br>
+        <span class="ln">4</span>&nbsp;&nbsp;&nbsp;&nbsp;console.<span class="fn">log</span>(secret);<br>
+        <span class="ln">5</span>&nbsp;&nbsp;}<br>
+        <br>
+        <span class="ln">6</span>&nbsp;&nbsp;window.myLib = { api };<br>
+        <span class="ln">7</span>})();<br>
+        <br>
+        <span class="cm">// secret 拿不到</span><br>
+        <span class="cm">// window.myLib.api() 可以用</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- =====================================================================
+     08 — Bundler 與 Closure
+     ===================================================================== -->
+<section class="slide content-slide" id="s08" aria-label="Bundler">
+  <div class="orb orb-right"></div>
+  <div class="slide-inner">
+    <div class="chapter-tag reveal">現代應用</div>
+    <h2 class="slide-title reveal">Bundler 底層<br>也在大量使用 <span class="italic">Closure</span></h2>
+    <p class="body-text reveal">你平常用 webpack 打包，把輸出拆開來看，底層結構大致是：</p>
+    <ul class="bullet-list stagger">
+      <li class="reveal">用一個大 <strong>IIFE 包住整包程式</strong>，先做環境隔離</li>
+      <li class="reveal">在內部建立 <code>modules</code> 的對照表</li>
+      <li class="reveal">實作 <code>require</code> 做載入與快取</li>
+      <li class="reveal">再執行入口檔案</li>
+    </ul>
+    <p class="body-text reveal">整套機制之所以能運作，核心原因是：<strong>closure 讓 <code>modules</code>、<code>cache</code>、<code>require</code> 這些內部狀態被保留，且不會污染外部環境</strong>。</p>
+  </div>
+</section>
+
+
+<!-- =====================================================================
+     09 — SECTION BREAK：HOF
+     ===================================================================== -->
+<section class="slide section-break" id="s09" aria-label="章節二">
+  <div class="orb" style="width:700px;height:700px;top:50%;left:50%;transform:translate(-50%,-50%);background:radial-gradient(circle,rgba(138,180,248,0.07),transparent 65%);"></div>
+  <div class="sb-inner">
+    <span class="sb-num reveal-scale">II</span>
+    <span class="sb-tag reveal">第二章 · Higher-Order Function</span>
+    <h2 class="sb-title reveal">幫函式加上功能</h2>
+    <div class="h-rule reveal" style="margin:0 auto;"></div>
+    <p class="sb-desc reveal">從 React HOC 到 debounce、throttle 與 memoize——把既有的東西包起來，然後加一層行為</p>
+  </div>
+</section>
+
+
+<!-- =====================================================================
+     10 — 為什麼需要 HOF
+     ===================================================================== -->
+<section class="slide content-slide" id="s10" aria-label="HOF 動機">
+  <div class="orb orb-right"></div>
+  <div class="slide-inner">
+    <div class="chapter-tag reveal">HOF 動機</div>
+    <h2 class="slide-title reveal">「到處都要加<br>一樣的邏輯」——<br>這就是問題所在</h2>
+    <p class="body-text reveal">Class component 年代，「到處都要加一樣的檢查或行為」時：</p>
+    <ul class="bullet-list stagger">
+      <li class="reveal">權限檢查的程式碼<strong>散落在很多元件裡</strong></li>
+      <li class="reveal">規則一改就要<strong>到處修，維護成本高</strong></li>
+    </ul>
+    <p class="body-text reveal">更好的方式：把「權限檢查」抽成一個可重複使用的<strong>包裝層</strong>，讓元件本身只專注在顯示內容。</p>
+  </div>
+</section>
+
+
+<!-- =====================================================================
+     11 — HOC
+     ===================================================================== -->
+<section class="slide content-slide" id="s11" aria-label="HOC">
+  <div class="orb orb-left"></div>
+  <div class="slide-inner">
+    <div class="chapter-tag reveal">Higher-Order Component</div>
+    <h2 class="slide-title reveal">HOC：用函式接收元件<br>回傳<span class="italic">加強過的元件</span></h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:clamp(0.6rem,1.2vw,1rem);position:relative;z-index:1;" class="stagger">
+      <div class="topic-card reveal"><div style="font-family:var(--font-mono);font-size:var(--small-size);color:var(--blue);margin-bottom:0.4rem;letter-spacing:0.1em;">INPUT</div><h3 style="font-family:var(--font-serif);font-size:clamp(0.9rem,1.7vw,1.15rem);font-weight:600;color:var(--text);">一個 Component</h3><p style="font-family:var(--font-sans);font-size:var(--small-size);font-weight:300;color:var(--muted);margin-top:0.3rem;line-height:1.5;">原本的元件，只專注在顯示內容</p></div>
+      <div class="topic-card reveal"><div style="font-family:var(--font-mono);font-size:var(--small-size);color:var(--amber);margin-bottom:0.4rem;letter-spacing:0.1em;">WRAP</div><h3 style="font-family:var(--font-serif);font-size:clamp(0.9rem,1.7vw,1.15rem);font-weight:600;color:var(--text);">額外行為</h3><p style="font-family:var(--font-sans);font-size:var(--small-size);font-weight:300;color:var(--muted);margin-top:0.3rem;line-height:1.5;">權限檢查、紀錄、埋點、錯誤處理</p></div>
+      <div class="topic-card reveal"><div style="font-family:var(--font-mono);font-size:var(--small-size);color:var(--blue);margin-bottom:0.4rem;letter-spacing:0.1em;">OUTPUT</div><h3 style="font-family:var(--font-serif);font-size:clamp(0.9rem,1.7vw,1.15rem);font-weight:600;color:var(--text);">加強版 Component</h3><p style="font-family:var(--font-sans);font-size:var(--small-size);font-weight:300;color:var(--muted);margin-top:0.3rem;line-height:1.5;">原元件邏輯不變，外層統一管理橫切邏輯</p></div>
+    </div>
+    <p class="body-text reveal">HOC 想解決的核心：<strong>不要讓橫切需求侵入每個元件內部</strong>。它本質上只是 Higher-Order Function 的一種應用。</p>
+  </div>
+</section>
+
+
+<!-- =====================================================================
+     12 — Debounce
+     ===================================================================== -->
+<section class="slide" id="s12" aria-label="Debounce">
+  <div class="orb" style="width:380px;height:380px;top:-80px;right:-80px;background:radial-gradient(circle,rgba(240,168,85,0.08),transparent 70%);"></div>
+  <div class="two-col-grid" style="align-items:start;padding-top:clamp(2rem,5vh,5rem);">
+    <div class="two-col-left">
+      <div class="chapter-tag reveal">Debounce</div>
+      <h2 class="slide-title reveal">把「連續觸發」<br>變成<span class="italic">「停下來才做」</span></h2>
+      <p class="body-text reveal">使用者快速打字時，每打一字就呼叫 API 很浪費。設定 300ms：只要還在輸入就重設計時器，停止後才真的執行。</p>
+      <div style="display:flex;flex-direction:column;gap:0.5rem;" class="stagger">
+        <div style="display:flex;align-items:center;gap:0.8rem;" class="reveal"><span style="color:var(--amber);font-family:var(--font-mono);font-size:var(--small-size);">適合</span><span style="font-family:var(--font-sans);font-size:var(--small-size);color:var(--muted);">搜尋建議、即時輸入驗證</span></div>
+        <div style="display:flex;align-items:center;gap:0.8rem;" class="reveal"><span style="color:var(--amber);font-family:var(--font-mono);font-size:var(--small-size);">效果</span><span style="font-family:var(--font-sans);font-size:var(--small-size);color:var(--muted);">原本 10 次請求 → 變成 1 次</span></div>
+      </div>
+    </div>
+    <div class="two-col-right">
+      <div class="code-block reveal" data-lang="JS">
+        <span class="kw">function</span> <span class="fn">debounce</span>(fn, delay) {<br>
+        &nbsp;&nbsp;<span class="kw">let</span> timer;<br>
+        &nbsp;&nbsp;<span class="kw">return function</span>(...args) {<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span class="fn">clearTimeout</span>(timer);<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;timer = <span class="fn">setTimeout</span>(() =&gt; {<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="fn">fn</span>.apply(<span class="kw">this</span>, args);<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;}, delay);<br>
+        &nbsp;&nbsp;};<br>
+        }<br>
+        <br>
+        <span class="cm">// 停止輸入 300ms 後才搜尋</span><br>
+        <span class="kw">const</span> search = <span class="fn">debounce</span>(callAPI, <span class="num">300</span>);<br>
+        input.<span class="fn">addEventListener</span>(<span class="str">'input'</span>, search);
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- =====================================================================
+     13 — Throttle
+     ===================================================================== -->
+<section class="slide" id="s13" aria-label="Throttle">
+  <div class="orb" style="width:350px;height:350px;bottom:-100px;left:-80px;background:radial-gradient(circle,rgba(138,180,248,0.07),transparent 70%);"></div>
+  <div class="two-col-grid" style="align-items:start;padding-top:clamp(2rem,5vh,5rem);">
+    <div class="two-col-left">
+      <div class="chapter-tag reveal">Throttle</div>
+      <h2 class="slide-title reveal">把「觸發頻率」<br>限制在<span class="italic" style="color:var(--blue);">固定節奏</span></h2>
+      <p class="body-text reveal">有些事件需要持續回饋（resize、scroll），但不希望每個事件都觸發昂貴計算。設定 50ms：不管多密集，固定間隔最多執行一次。</p>
+      <div style="display:flex;flex-direction:column;gap:0.5rem;" class="stagger">
+        <div style="display:flex;align-items:center;gap:0.8rem;" class="reveal"><span style="color:var(--blue);font-family:var(--font-mono);font-size:var(--small-size);">適合</span><span style="font-family:var(--font-sans);font-size:var(--small-size);color:var(--muted);">scroll 監聽、resize 重新排版</span></div>
+        <div style="display:flex;align-items:center;gap:0.8rem;" class="reveal"><span style="color:var(--blue);font-family:var(--font-mono);font-size:var(--small-size);">效果</span><span style="font-family:var(--font-sans);font-size:var(--small-size);color:var(--muted);">更新頻率穩定，效能可控</span></div>
+      </div>
+    </div>
+    <div class="two-col-right">
+      <div class="code-block reveal" data-lang="JS">
+        <span class="kw">function</span> <span class="fn">throttle</span>(fn, interval) {<br>
+        &nbsp;&nbsp;<span class="kw">let</span> lastTime = <span class="num">0</span>;<br>
+        &nbsp;&nbsp;<span class="kw">return function</span>(...args) {<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> now = Date.<span class="fn">now</span>();<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">if</span> (now - lastTime &gt;= interval) {<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;lastTime = now;<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="fn">fn</span>.apply(<span class="kw">this</span>, args);<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;}<br>
+        &nbsp;&nbsp;};<br>
+        }<br>
+        <br>
+        <span class="cm">// 每 50ms 最多執行一次</span><br>
+        <span class="kw">const</span> onResize = <span class="fn">throttle</span>(recalc, <span class="num">50</span>);<br>
+        window.<span class="fn">addEventListener</span>(<span class="str">'resize'</span>, onResize);
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- =====================================================================
+     14 — Debounce vs Throttle
+     ===================================================================== -->
+<section class="slide content-slide" id="s14" aria-label="比較">
+  <div class="orb orb-right"></div>
+  <div class="slide-inner">
+    <div class="chapter-tag reveal">比較</div>
+    <h2 class="slide-title reveal">Debounce vs Throttle<br><span class="italic">怎麼選？</span></h2>
+    <div class="compare-grid stagger">
+      <div class="compare-card amber reveal">
+        <span class="cc-label amber">Debounce</span>
+        <div class="cc-name">等事件停止後再做</div>
+        <p class="cc-desc">只要事件還在持續，就先暫停等待。停止後才執行一次。適合只需要最後結果的情境。</p>
+        <div class="cc-tags"><span class="cc-tag amber">搜尋建議</span><span class="cc-tag amber">輸入驗證</span><span class="cc-tag amber">等停手才送出</span></div>
+      </div>
+      <div class="compare-card blue reveal">
+        <span class="cc-label blue">Throttle</span>
+        <div class="cc-name">事件持續也定期做</div>
+        <p class="cc-desc">不管事件多密集，固定時間內最多只執行一次，保持穩定節奏。適合需要持續回饋的情境。</p>
+        <div class="cc-tags"><span class="cc-tag blue">scroll 監聽</span><span class="cc-tag blue">resize 排版</span><span class="cc-tag blue">拖曳互動</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- =====================================================================
+     15 — Memoize
+     ===================================================================== -->
+<section class="slide" id="s15" aria-label="Memoize">
+  <div class="two-col-grid">
+    <div class="two-col-left">
+      <div class="chapter-tag reveal">Memoize</div>
+      <h2 class="slide-title reveal">把「算過的結果」留下來<br><span class="italic">下次直接用</span></h2>
+      <p class="body-text reveal">控制的不是「什麼時候執行」，而是「同樣的輸入不要重算」。用參數當 key，把結果存在 Map，下次命中直接回傳快取。</p>
+      <ul class="bullet-list stagger">
+        <li class="reveal">純函式且<strong>輸入輸出穩定</strong>的計算</li>
+        <li class="reveal">重複查詢、<strong>重複轉換資料</strong>的流程</li>
+        <li class="reveal"><strong>成本高且命中率高</strong>的運算</li>
+      </ul>
+    </div>
+    <div class="two-col-right">
+      <div class="code-block reveal" data-lang="JS">
+        <span class="kw">function</span> <span class="fn">memoize</span>(fn) {<br>
+        &nbsp;&nbsp;<span class="kw">const</span> cache = <span class="kw">new</span> Map();<br>
+        &nbsp;&nbsp;<span class="kw">return function</span>(...args) {<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> key = JSON.<span class="fn">stringify</span>(args);<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">if</span> (cache.<span class="fn">has</span>(key)) {<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return</span> cache.<span class="fn">get</span>(key);<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;}<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> result = <span class="fn">fn</span>(...args);<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;cache.<span class="fn">set</span>(key, result);<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return</span> result;<br>
+        &nbsp;&nbsp;};<br>
+        }<br>
+        <br>
+        <span class="cm">// 費氏數列：第二次起直接回傳</span><br>
+        <span class="kw">const</span> fib = <span class="fn">memoize</span>(n =&gt;<br>
+        &nbsp;&nbsp;n &lt;= <span class="num">1</span> ? n : <span class="fn">fib</span>(n-<span class="num">1</span>) + <span class="fn">fib</span>(n-<span class="num">2</span>));
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- =====================================================================
+     16 — 串成同一個觀念
+     ===================================================================== -->
+<section class="slide content-slide" id="s16" aria-label="總結觀念">
+  <div class="orb orb-left"></div>
+  <div class="slide-inner">
+    <div class="chapter-tag reveal">核心洞見</div>
+    <h2 class="slide-title reveal">它們都在做同一件事：<span class="italic">包裝</span></h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:clamp(0.6rem,1.2vw,1rem);position:relative;z-index:1;" class="stagger">
+      <div class="topic-card reveal"><div style="font-family:var(--font-mono);font-size:var(--small-size);color:var(--amber);margin-bottom:0.4rem;">HOC</div><h3 style="font-family:var(--font-serif);font-size:clamp(0.9rem,1.7vw,1.1rem);font-weight:600;color:var(--text);">包裝元件</h3><p style="font-family:var(--font-sans);font-size:var(--small-size);font-weight:300;color:var(--muted);margin-top:0.25rem;line-height:1.5;">加入權限等額外行為</p></div>
+      <div class="topic-card reveal"><div style="font-family:var(--font-mono);font-size:var(--small-size);color:var(--amber);margin-bottom:0.4rem;">Debounce / Throttle</div><h3 style="font-family:var(--font-serif);font-size:clamp(0.9rem,1.7vw,1.1rem);font-weight:600;color:var(--text);">包裝事件處理函式</h3><p style="font-family:var(--font-sans);font-size:var(--small-size);font-weight:300;color:var(--muted);margin-top:0.25rem;line-height:1.5;">控制觸發策略</p></div>
+      <div class="topic-card reveal"><div style="font-family:var(--font-mono);font-size:var(--small-size);color:var(--blue);margin-bottom:0.4rem;">Memoize</div><h3 style="font-family:var(--font-serif);font-size:clamp(0.9rem,1.7vw,1.1rem);font-weight:600;color:var(--text);">包裝計算函式</h3><p style="font-family:var(--font-sans);font-size:var(--small-size);font-weight:300;color:var(--muted);margin-top:0.25rem;line-height:1.5;">加入快取機制</p></div>
+      <div class="topic-card reveal" style="border-color:var(--divider);background:var(--amber-dim);"><div style="font-family:var(--font-mono);font-size:var(--small-size);color:var(--amber);margin-bottom:0.4rem;">共同核心</div><h3 style="font-family:var(--font-serif);font-size:clamp(0.9rem,1.7vw,1.1rem);font-weight:600;color:var(--text);">不改主體邏輯</h3><p style="font-family:var(--font-sans);font-size:var(--small-size);font-weight:300;color:var(--muted);margin-top:0.25rem;line-height:1.5;">在外面加一層，附加新能力</p></div>
+    </div>
+  </div>
+</section>
+
+
+<!-- =====================================================================
+     17 — CLOSING
+     ===================================================================== -->
+<section class="slide" id="s17" aria-label="結語">
+  <div class="orb close-orb"></div>
+  <div class="orb" style="width:350px;height:350px;bottom:-100px;left:10%;background:radial-gradient(circle,rgba(138,180,248,0.06),transparent 70%);"></div>
+  <div class="close-inner">
+    <span class="chapter-tag reveal" style="justify-content:center;">結語 · Chapter 4.3</span>
+    <h2 class="close-title reveal">Closure 是<br>「建立一個<span class="italic">小世界</span>」<br>的能力</h2>
+    <div class="h-rule reveal" style="margin:0 auto;"></div>
+    <p class="close-quote reveal">當你想在程式裡劃出一塊「只屬於我、外界別亂碰」的小天地時，closure 幾乎是最直接、也最可靠的選項。</p>
+    <p class="reveal" style="font-family:var(--font-sans);font-size:var(--small-size);color:var(--muted);letter-spacing:0.05em;margin-top:0.25rem;">橫切需求不要散落，集中在包裝層處理</p>
+  </div>
+</section>
+
+
+<script>
+/* ===========================================
+   PRESENTATION CONTROLLER
+   =========================================== */
+class SlidePresentation {
+  constructor() {
+    this.slides  = Array.from(document.querySelectorAll('.slide'));
+    this.total   = this.slides.length;
+    this.current = 0;
+    this.setupObserver();
+    this.setupKeys();
+    this.setupTouch();
+    this.setupNavDots();
+    this.updateUI(0);
+    this.slides[0].classList.add('visible');
+  }
+
+  setupObserver() {
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        e.target.classList.add('visible');
+        this.updateUI(this.slides.indexOf(e.target));
+      });
+    }, { threshold: 0.5 });
+    this.slides.forEach(s => obs.observe(s));
+  }
+
+  updateUI(idx) {
+    this.current = idx;
+    const pct = ((idx + 1) / this.total) * 100;
+    document.getElementById('progress-bar').style.width = pct + '%';
+    document.querySelectorAll('.nav-dot').forEach((d, i) =>
+      d.classList.toggle('active', i === idx));
+    const p = n => String(n).padStart(2, '0');
+    document.getElementById('slide-counter').textContent =
+      p(idx + 1) + ' / ' + p(this.total);
+  }
+
+  goTo(idx) {
+    idx = Math.max(0, Math.min(idx, this.total - 1));
+    this.slides[idx].scrollIntoView({ behavior: 'smooth' });
+  }
+
+  setupKeys() {
+    document.addEventListener('keydown', e => {
+      if (e.target.getAttribute('contenteditable') === 'true') return;
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); this.goTo(this.current + 1); }
+      else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); this.goTo(this.current - 1); }
+      else if (e.key === 'Home') { e.preventDefault(); this.goTo(0); }
+      else if (e.key === 'End')  { e.preventDefault(); this.goTo(this.total - 1); }
+    });
+  }
+
+  setupTouch() {
+    let sy = 0, sx = 0;
+    document.addEventListener('touchstart', e => { sy = e.touches[0].clientY; sx = e.touches[0].clientX; }, { passive: true });
+    document.addEventListener('touchend', e => {
+      const dy = sy - e.changedTouches[0].clientY;
+      const dx = sx - e.changedTouches[0].clientX;
+      if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 50) this.goTo(this.current + (dy > 0 ? 1 : -1));
+    }, { passive: true });
+  }
+
+  setupNavDots() {
+    const nav = document.getElementById('nav-dots');
+    this.slides.forEach((_, i) => {
+      const d = document.createElement('button');
+      d.className = 'nav-dot';
+      d.setAttribute('aria-label', '前往第 ' + (i + 1) + ' 張');
+      d.addEventListener('click', () => this.goTo(i));
+      nav.appendChild(d);
+    });
+  }
+}
+
+/* ===========================================
+   INLINE EDITOR
+   Saves text content per element to localStorage.
+   Uses textContent (never innerHTML) to avoid XSS.
+   =========================================== */
+class InlineEditor {
+  constructor() {
+    this.isActive  = false;
+    this.toggle    = document.getElementById('editToggle');
+    this.hotzone   = document.getElementById('editHotzone');
+    this.hideTimer = null;
+    this.STORAGE_KEY = 'closure-slides-edits-v1';
+
+    // Selector for editable text nodes (excludes code spans)
+    this.selector = [
+      '.big-title', '.sub-title', '.desc', '.sb-title', '.sb-desc',
+      '.slide-title', '.body-text', '.close-title', '.close-quote',
+      '.concept-card h3', '.concept-card p',
+      '.principle-body h3', '.principle-body p',
+      '.e-body h3', '.e-body p',
+      '.cc-name', '.cc-desc',
+      '.bullet-list li',
+      'h2.slide-title'
+    ].join(', ');
+
+    this.setupHotzone();
+    this.setupKeyboard();
+    this.toggle.addEventListener('click', () => this.toggleMode());
+    this.loadEdits();
+  }
+
+  setupHotzone() {
+    const show = () => { clearTimeout(this.hideTimer); this.toggle.classList.add('show'); };
+    const hide = () => { this.hideTimer = setTimeout(() => { if (!this.isActive) this.toggle.classList.remove('show'); }, 400); };
+    this.hotzone.addEventListener('mouseenter', show);
+    this.hotzone.addEventListener('mouseleave', hide);
+    this.hotzone.addEventListener('click', () => this.toggleMode());
+    this.toggle.addEventListener('mouseenter', show);
+    this.toggle.addEventListener('mouseleave', hide);
+  }
+
+  setupKeyboard() {
+    document.addEventListener('keydown', e => {
+      if (e.target.getAttribute('contenteditable') === 'true') return;
+      if ((e.key === 'e' || e.key === 'E')) this.toggleMode();
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); if (this.isActive) { this.saveEdits(); this.toggleMode(); } }
+    });
+  }
+
+  toggleMode() {
+    this.isActive = !this.isActive;
+    document.body.classList.toggle('edit-mode', this.isActive);
+    this.toggle.classList.toggle('active', this.isActive);
+    this.toggle.classList.add('show');
+    this.toggle.textContent = this.isActive ? '✓ 完成 (Ctrl+S)' : '✏ 編輯';
+
+    document.querySelectorAll(this.selector).forEach(el => {
+      if (this.isActive) {
+        el.setAttribute('contenteditable', 'true');
+        el.setAttribute('spellcheck', 'false');
+      } else {
+        el.removeAttribute('contenteditable');
+      }
+    });
+
+    if (!this.isActive) this.saveEdits();
+  }
+
+  /* Save only textContent of each editable element, keyed by index */
+  saveEdits() {
+    const edits = {};
+    document.querySelectorAll(this.selector).forEach((el, i) => {
+      edits[i] = el.textContent;
+    });
+    try {
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(edits));
+    } catch(e) { /* storage quota */ }
+  }
+
+  /* Restore textContent — never touches innerHTML */
+  loadEdits() {
+    try {
+      const raw = localStorage.getItem(this.STORAGE_KEY);
+      if (!raw) return;
+      const edits = JSON.parse(raw);
+      document.querySelectorAll(this.selector).forEach((el, i) => {
+        if (Object.prototype.hasOwnProperty.call(edits, i) && typeof edits[i] === 'string') {
+          el.textContent = edits[i];
+        }
+      });
+    } catch(e) { /* ignore corrupt storage */ }
+  }
+}
+
+const presentation = new SlidePresentation();
+const editor = new InlineEditor();
+</script>
+</body>
+</html>
